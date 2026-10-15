@@ -5,14 +5,21 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# 全局环境变量，确保 Tauri 和 Gradle 在构建时能稳定读取到路径
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+  NDK_HOME: /usr/local/lib/android/sdk/ndk/25.2.9519653
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -30,6 +37,12 @@ jobs:
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.2.9519653"
 
+      - name: Verify Android SDK & NDK
+        run: |
+          echo "ANDROID_HOME is: $ANDROID_HOME"
+          echo "NDK_HOME is: $NDK_HOME"
+          ls -la $NDK_HOME
+
       - name: Generate debug keystore
         run: |
           keytool -genkeypair -v -keystore debug.keystore \
@@ -45,6 +58,12 @@ jobs:
       - name: Install Rust Android targets
         run: rustup target add aarch64-linux-android
 
+      # 缓存 Rust 依赖，显著加快后续构建速度
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Create missing config file
         run: |
           mkdir -p src-tauri/configuration
@@ -56,16 +75,22 @@ jobs:
       - name: Build frontend
         run: pnpm exec vite build
 
+      # 将安装 Tauri CLI 单独拆分，方便排查错误
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2"
+
+      # 初始化 Android 项目并赋予 gradlew 执行权限
+      - name: Init Android project and fix permissions
+        run: |
+          cd src-tauri
+          cargo tauri android init
+          chmod +x gen/android/gradlew
+
+      # 使用 --ci 标志防止 CLI 卡在交互提示
       - name: Build APK
         run: |
           cd src-tauri
-          cargo install tauri-cli --version "^2"
-          cargo tauri android init
-          chmod +x gen/android/gradlew
-          export ANDROID_HOME=${ANDROID_HOME}
-          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}
-          export ANDROID_NDK_HOME=${ANDROID_NDK_HOME}
-          cargo tauri android build --verbose
+          cargo tauri android build --ci --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
