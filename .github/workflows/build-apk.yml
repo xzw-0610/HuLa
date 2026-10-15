@@ -52,6 +52,9 @@ jobs:
           cd src-tauri
           cargo install tauri-cli --version "^2"
           cargo tauri android init
+          chmod +x gen/android/gradlew
+          export ANDROID_HOME=${ANDROID_HOME}
+          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}
           cargo tauri android build
 
       - name: Upload APK
