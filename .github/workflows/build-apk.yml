@@ -30,6 +30,15 @@ jobs:
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.2.9519653"
 
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -55,7 +64,8 @@ jobs:
           chmod +x gen/android/gradlew
           export ANDROID_HOME=${ANDROID_HOME}
           export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}
-          cargo tauri android build
+          export ANDROID_NDK_HOME=${ANDROID_NDK_HOME}
+          cargo tauri android build --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
