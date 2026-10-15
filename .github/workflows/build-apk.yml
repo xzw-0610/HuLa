@@ -8,7 +8,8 @@ on:
 env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-  NDK_HOME: /usr/local/lib/android/sdk/ndk/25.2.9519653
+  # ★ 关键修复 1: 更新 NDK 路径以匹配 HuLa 项目要求
+  NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
 
 jobs:
   build:
@@ -31,17 +32,16 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK & NDK
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.2.9519653"
+          # ★ 关键修复 1: 安装 HuLa 项目所需的正确版本
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0" "ndk;28.2.13676358"
 
       - name: Verify Android SDK & NDK
         run: |
           echo "ANDROID_HOME: $ANDROID_HOME"
           echo "NDK_HOME: $NDK_HOME"
-          test -d "$ANDROID_HOME" && echo "SDK exists" || echo "SDK missing"
-          test -d "$NDK_HOME" && echo "NDK exists" || echo "NDK missing"
           ls -la $ANDROID_HOME/ndk/
 
       - name: Generate debug keystore
@@ -64,7 +64,6 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # ★ 关键修复：写入符合 HuLa 后端要求的完整 local.yaml 配置
       - name: Create local.yaml configuration
         run: |
           mkdir -p src-tauri/configuration
@@ -92,16 +91,34 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2"
 
-      - name: Init Android project and fix permissions
+      - name: Init Android project
         run: |
           cd src-tauri
           cargo tauri android init
-          chmod 755 gen/android/gradlew
+
+      # ★ 关键修复 2: 升级 Gradle 版本以匹配新版 AGP 要求
+      - name: Update Gradle Wrapper Version
+        run: |
+          cd src-tauri/gen/android/gradle/wrapper
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip|' gradle-wrapper.properties
+          cat gradle-wrapper.properties
+
+      # ★ 关键修复 3: 添加 ProGuard 规则，防止 R8 剥离 Tauri 关键代码
+      - name: Configure ProGuard Rules
+        run: |
+          cd src-tauri/gen/android/app
+          echo "# Keep Tauri Bridge" >> proguard-rules.pro
+          echo "-keep class com.hula.app.generated.** { *; }" >> proguard-rules.pro
+          echo "-keepattributes *Annotation*" >> proguard-rules.pro
+          echo "-keepattributes Signature" >> proguard-rules.pro
+
+      - name: Fix gradlew permissions
+        run: chmod 755 src-tauri/gen/android/gradlew
 
       - name: Build APK
         run: |
           cd src-tauri
-          cargo tauri android build --ci --verbose
+          cargo tauri android build --ci --verbose -- --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
