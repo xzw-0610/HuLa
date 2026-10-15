@@ -40,7 +40,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Build frontend
-        run: pnpm build
+        run: pnpm exec vite build
 
       - name: Build APK
         run: |
