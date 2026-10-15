@@ -8,7 +8,6 @@ on:
 env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-  # ★ 关键修复 1: 更新 NDK 路径以匹配 HuLa 项目要求
   NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
 
 jobs:
@@ -35,7 +34,6 @@ jobs:
       - name: Setup Android SDK & NDK
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
-          # ★ 关键修复 1: 安装 HuLa 项目所需的正确版本
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0" "ndk;28.2.13676358"
 
       - name: Verify Android SDK & NDK
@@ -96,14 +94,12 @@ jobs:
           cd src-tauri
           cargo tauri android init
 
-      # ★ 关键修复 2: 升级 Gradle 版本以匹配新版 AGP 要求
       - name: Update Gradle Wrapper Version
         run: |
           cd src-tauri/gen/android/gradle/wrapper
           sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip|' gradle-wrapper.properties
           cat gradle-wrapper.properties
 
-      # ★ 关键修复 3: 添加 ProGuard 规则，防止 R8 剥离 Tauri 关键代码
       - name: Configure ProGuard Rules
         run: |
           cd src-tauri/gen/android/app
@@ -115,10 +111,11 @@ jobs:
       - name: Fix gradlew permissions
         run: chmod 755 src-tauri/gen/android/gradlew
 
+      # 修复点：移除了非法的 -- --stacktrace 参数，只保留 --ci 和 --verbose
       - name: Build APK
         run: |
           cd src-tauri
-          cargo tauri android build --ci --verbose -- --stacktrace
+          cargo tauri android build --ci --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
