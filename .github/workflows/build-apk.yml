@@ -37,7 +37,7 @@ jobs:
         run: rustup target add aarch64-linux-android
 
       - name: Install dependencies
-        run: pnpm install --ignore-scripts
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Build frontend
         run: pnpm build
