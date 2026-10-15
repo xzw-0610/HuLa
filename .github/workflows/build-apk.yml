@@ -5,11 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-# 全局环境变量，确保 Tauri 和 Gradle 在构建时能稳定读取到路径
 env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-  # 根据 HuLa 官方文档要求，指定 NDK 版本
   NDK_HOME: /usr/local/lib/android/sdk/ndk/28.2.13676358
 
 jobs:
@@ -19,24 +17,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 修复弃用警告：升级到 v5
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 修复 Node 20 弃用警告：显式指定 Node 22
+      # ★ 关键修复：必须先安装 pnpm，后面的 setup-node 才能识别到它
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      # 此时 pnpm 已存在，可以安全开启缓存
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      # 安装 HuLa 项目指定的 Android SDK 和 NDK 版本
       - name: Setup Android SDK & NDK
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
@@ -68,7 +65,6 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # 根据官方文档，必须提供完整的 local.yaml，空文件会导致后端初始化失败
       - name: Create local.yaml configuration
         run: |
           mkdir -p src-tauri/configuration
@@ -101,14 +97,12 @@ jobs:
           cd src-tauri
           cargo tauri android init
 
-      # 升级 Gradle 版本以匹配新版 Android Gradle Plugin (AGP)
       - name: Update Gradle Wrapper Version
         run: |
           cd src-tauri/gen/android/gradle/wrapper
           sed -i 's|distributionUrl=.*|distributionUrl=https://services.gradle.org/distributions/gradle-8.14.3-bin.zip|' gradle-wrapper.properties
           cat gradle-wrapper.properties
 
-      # 添加 ProGuard 规则，防止 R8 剥离 Tauri 关键代码导致构建失败
       - name: Configure ProGuard Rules
         run: |
           cd src-tauri/gen/android/app
@@ -125,7 +119,7 @@ jobs:
       - name: Fix gradlew permissions
         run: chmod 755 src-tauri/gen/android/gradlew
 
-      # 移除之前错误的 --stacktrace 参数，仅保留 Tauri 支持的 --ci 和 --verbose
+      # 这里恢复正常的构建命令，如果再次失败，请留意 Build APK 这一栏底部的报错
       - name: Build APK
         run: |
           cd src-tauri
