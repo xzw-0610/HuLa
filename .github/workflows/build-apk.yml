@@ -23,11 +23,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # ★ 关键修复：必须先安装 pnpm，后面的 setup-node 才能识别到它
       - name: Install pnpm
         run: npm install -g pnpm
 
-      # 此时 pnpm 已存在，可以安全开启缓存
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -38,12 +36,6 @@ jobs:
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0" "ndk;28.2.13676358"
-
-      - name: Verify Android SDK & NDK
-        run: |
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          echo "NDK_HOME: $NDK_HOME"
-          ls -la $ANDROID_HOME/ndk/
 
       - name: Generate debug keystore
         run: |
@@ -97,10 +89,11 @@ jobs:
           cd src-tauri
           cargo tauri android init
 
-      - name: Update Gradle Wrapper Version
+      # 关键修复：降级 Gradle 版本以兼容旧版 Data Binding 任务
+      - name: Downgrade Gradle Wrapper Version
         run: |
           cd src-tauri/gen/android/gradle/wrapper
-          sed -i 's|distributionUrl=.*|distributionUrl=https://services.gradle.org/distributions/gradle-8.14.3-bin.zip|' gradle-wrapper.properties
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6-bin.zip|' gradle-wrapper.properties
           cat gradle-wrapper.properties
 
       - name: Configure ProGuard Rules
@@ -119,7 +112,6 @@ jobs:
       - name: Fix gradlew permissions
         run: chmod 755 src-tauri/gen/android/gradlew
 
-      # 这里恢复正常的构建命令，如果再次失败，请留意 Build APK 这一栏底部的报错
       - name: Build APK
         run: |
           cd src-tauri
