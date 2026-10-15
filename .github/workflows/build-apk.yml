@@ -47,7 +47,7 @@ jobs:
           cd src-tauri
           cargo install tauri-cli --version "^2"
           cargo tauri android init
-          cargo tauri android build -- --release
+          cargo tauri android build
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
